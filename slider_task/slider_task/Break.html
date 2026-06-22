@@ -1,0 +1,30 @@
+{{ block title }}
+    Take a break
+{{ endblock }}
+
+{{ block content }}
+
+<style>
+    .otree-timer {
+        display: none;
+    }
+    </style>
+You completed Round {{player.round_number}} with a point score of {{player.score}} sliders.
+<br><br>
+You will start the next round in <b>  <span id="remaining-time-value"> {{ C.TIME_FOR_BREAK }}</span></b> seconds.
+
+
+<script>
+    let displayedTimeLeft = {{ C.TIME_FOR_BREAK }};
+    const remainingTimeElement = document.getElementById('remaining-time-value');
+
+    const visualCountdownInterval = setInterval(() => {
+        if (displayedTimeLeft > 0) {
+            displayedTimeLeft -= 1; // Decrease displayed time by 1
+            remainingTimeElement.textContent = displayedTimeLeft; // Update the display
+        }
+    }, 1000); // Run every 1000ms (1 second)
+</script>
+{{ endblock }}
+
+

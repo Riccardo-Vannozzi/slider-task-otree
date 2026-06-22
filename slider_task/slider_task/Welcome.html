@@ -1,0 +1,74 @@
+{{ block title }}
+    Welcome to this study!
+{{ endblock }}
+
+{{ block content }}
+    Click below to start the practice round.
+<br><br>
+        <button class="otree-btn-next btn btn-primary">Continue</button>
+
+<!-- This script records participants' technical setup at the beginning of the study. First, it sends screen width
+and height to oTree. Second, it flags mobile devices using browser information
+such as touch support, coarse pointer detection, and actual touch events. This flag is used to optionally exclude
+participants using smartphones or tablets. -->
+<script>
+
+    // Screen size
+    function screenSize() {
+        const screenWidth = screen.width;
+        const screenHeight = screen.height;
+        liveSend({ information_type: "size", screen_width: screenWidth, screen_height: screenHeight });
+    }
+
+    document.addEventListener("DOMContentLoaded", screenSize);
+
+
+    // Device type
+    (function () {
+        var lastReported = null; // null | false | true
+        function mm(q){ return !!(window.matchMedia && matchMedia(q).matches); }
+        function isTouchSuspect() {
+            var nav = navigator || {};
+            return (
+                (typeof nav.maxTouchPoints === "number" && nav.maxTouchPoints > 0) ||
+                ("ontouchstart" in window) ||
+                mm("(any-pointer: coarse)")
+            );
+        }
+
+        function report(isTouch, phase) {
+            if (lastReported === isTouch) return;
+            if (typeof liveSend === "function") {
+                lastReported = isTouch;
+                try {
+                    liveSend({
+                        information_type: "is_mobile",
+                        is_mobile: isTouch,
+                        payload: { phase: phase }
+                    });
+                } catch (_) {
+                    lastReported = null;
+                }
+            } else {
+                setTimeout(function(){ report(isTouch, phase); }, 120);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const suspect = isTouchSuspect();
+            console.log("Touchscreen suspected:", suspect);
+            report(suspect, "domcontentloaded");
+        });
+
+        window.addEventListener("touchstart", function () {
+            console.log("Touchscreen confirmed by touchstart");
+            report(true, "touchstart");
+        }, { once: true, passive: true, capture: true });
+    })();
+
+</script>
+
+
+{{ endblock }}
+
+

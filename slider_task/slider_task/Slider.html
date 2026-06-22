@@ -1,0 +1,512 @@
+{{ block title }}
+{{ endblock }}
+{{ block content }}
+
+<!-- ===================================================================================================================
+CSS: Page layout and visual design
+
+This section defines the appearance and positioning of the task interface.
+========================================================================================================================
+ -->
+<style>
+
+/* Page background and task viewport */
+body {
+background: #f0f0f0;
+margin: 0;
+height: 100vh;
+  width: 100vw;
+overflow: hidden;
+border: calc(5px/var(--ratio)) solid #FFFF00;
+}
+
+/* Top header with round number and remaining time */
+#header {
+position: absolute;
+top: calc(13px/var(--ratio));
+left: calc(10px/var(--ratio));
+right: calc(8px/var(--ratio));
+height: calc(var(--screen-height)*0.045);
+background-color: #f0f0f0;
+border: 1px solid white;
+outline: 1px solid #A0A0A0;
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 0 10px;
+}
+
+/* Text inside the top header */
+.header-text {
+  font-size: 13px;
+  color: black;
+}
+
+/* Payment and score panel above the sliders */
+#count-frame {
+height: calc(var(--screen-height)*0.07);
+width: 100%;
+border-bottom: 1px solid #646464;
+background-color: #f0f0f0;
+position: relative;
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+margin-bottom: 3%;
+gap: 10px;
+}
+
+/* Text inside the payment and score panel */
+.count-text {
+margin: 0;
+font-size: 13px;
+color: black;
+}
+
+/* Current score */
+#point-score {
+margin-left: 10px;
+font-size: 13px;
+}
+
+/* Individual slider container */
+.box {
+position: relative;
+width: calc(197px/var(--ratio));
+height: calc(5px/var(--ratio));
+margin-top: 0;
+}
+
+/* General position and size of all sliders */
+canvas {
+position: absolute;
+top: 0;
+left: 0;
+width: calc(197px/var(--ratio));
+height: calc(4px/var(--ratio));
+}
+
+/* Knob size */
+.knobCanvas {
+z-index: 10;
+width: calc(5px/var(--ratio));
+height: calc(9px/var(--ratio));
+cursor: default;
+margin-top: calc(-5px/var(--ratio));
+}
+
+/* Slider endpoint markers */
+.rectCanvas {
+width: calc(197px/var(--ratio));
+height: calc(12px/var(--ratio));
+}
+
+/* Number displayed next to each slider */
+.segmentDisplay {
+position: absolute;
+top: -9px;
+left: calc(197px/var(--ratio) + calc(100px/var(--ratio)));
+font-size: 13px;
+color: #333;
+}
+
+/* Area containing all sliders */
+#sliders-container {
+position: absolute;
+top: calc(13px/var(--ratio) + calc(var(--screen-height)*0.045) + 14px/var(--ratio));
+left: calc(9px/var(--ratio));
+right: calc(7px/var(--ratio));
+bottom: calc(5px/var(--ratio));
+border: 1px solid #646464;
+background-color: #f0f0f0;
+}
+
+/* Column containing 16 sliders */
+.sliders-column {
+position: relative;
+width: 32%;
+height: calc(100% - 3% - var(--screen-height)*0.07);
+flex-direction: column;
+display: inline-block;
+vertical-align: top;
+bottom: calc(5px/var(--ratio));
+}
+
+/* Spacing between sliders */
+.slider-wrapper {
+margin-bottom: 4vh;
+}
+
+/* Full-screen warning shown if browser zoom changes (optional) */
+#zoomOverlay {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.8);
+display: flex;
+justify-content: center;
+align-items: center;
+color: white;
+font-size: 20px;
+z-index: 1000;
+}
+</style>
+
+<!-- ===================================================================================================================
+HTML: Page structure and task elements
+
+This section creates the visible elements of the task. Modify this section only to change the static page structure or
+the text shown to participants.
+========================================================================================================================
+ -->
+<body>
+<div id="zoomOverlay" style="display:none;">
+    <p>The zoom has changed. Please restore the initial zoom level of the browser.</p>
+</div>
+<div id="header">
+  <div class="header-text" id="playing-round">Paying Round: <span style="margin-left: 10px;">{{player.round_number}} out of {{C.NUM_ROUNDS}}</span></div>
+  <div class="header-text" id="remaining-time">Remaining time [sec]: <span id="remaining-time-value" style="color: red; font-size:13px">{{player.time_left}}</span></div></div>
+
+<div id="sliders-container">
+  <div id="count-frame">
+    <div class="count-text">
+      <span>The payment per slider is {{C.PIECE_RATE}} cents (USD)</span>
+    </div>
+  <div class="count-text">
+    <span>Currently, your point score is:</span>
+    <span id="point-score">0</span>
+  </div>
+</div>
+  <div class="sliders-column" id="column1">
+    <!-- The slider HTML will be dynamically generated here -->
+  </div>
+  <div class="sliders-column" id="column2">
+    <!-- The slider HTML will be dynamically generated here -->
+  </div>
+  <div class="sliders-column" id="column3">
+    <!-- Sliders 33-48 will be generated here -->
+  </div>
+</div>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+</body>
+
+
+<!-- ===================================================================================================================
+JavaScript: Task logic
+========================================================================================================================
+ -->
+
+<script>
+
+/* =======================================================
+   1. Set constants and state variables
+
+    This section sets global variables. Change only to modify number of sliders that are displayed (sliderCount).
+   =======================================================
+    */
+
+//Set number of sliders, up to a maximum of 48
+const sliderCount = 48;
+
+const TimeTot = {{C.TIME_FOR_TASK}}
+const leftMargins = [5, 3, 8, 1, 4, 2, 9, 2, 4, 2, 7, 4, 10, 3, 6, 10];
+
+let displayedTimeLeft = {{ player.time_left }};
+let currentScore = 0;
+let initialDPR;
+let sliderStates = new Array(sliderCount).fill(false);
+
+const remainingTimeElement = document.getElementById('remaining-time-value');
+const column1 = document.querySelector('#column1');
+const column2 = document.querySelector('#column2');
+const column3 = document.querySelector('#column3');
+
+
+/* =======================================================
+   2. CORE SLIDER ENGINE — DO NOT MODIFY
+
+   This section creates, draws, and controls user interactions with the sliders.
+   =======================================================
+    */
+
+/* ---------- 2.1 Create slider HTML ---------- */
+
+function createSliderHtml(sliderIndex, leftMargin) {
+const adjustedLeftMargin = leftMargin/0.33 + 5;
+
+  return `
+    <div class="slider-wrapper">
+      <div class="box" id="container${sliderIndex}" style="margin-left: ${adjustedLeftMargin}%; ">
+        <canvas class="lineCanvas" id="line${sliderIndex}Canvas" width="197" height="4"></canvas>
+        <canvas class="knobCanvas" id="knob${sliderIndex}Canvas" width="5" height="9" style="margin-top: -1px;"></canvas>
+        <canvas class="rectCanvas" id="rect${sliderIndex}Canvas" width="197" height="12"></canvas>
+        <div class="segmentDisplay" id="segment${sliderIndex}Display">0</div>
+      </div>
+    </div>`;
+}
+
+function drawLines(ctx) {
+  const lineColors = ['#A0A0A0', '#696969', '#E3E3E3', '#FFFFFF'];
+  for (let y = 0; y < 4; y++) {
+    ctx.fillStyle = lineColors[y];
+    ctx.fillRect(0, y, 196, 1);
+
+    if (y === 1 || y === 2) {
+      ctx.fillStyle = '#E3E3E3';
+      ctx.fillRect(195, y, 1, 1);
+    }
+
+    if (y === 1 || y === 2) {
+      ctx.fillStyle = '#A0A0A0';
+      ctx.fillRect(0, y, 1, 1);
+    }
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(196, y, 1, 1);
+  }
+}
+
+function drawRectangles(ctx) {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(2, 9, 1, 3);
+  ctx.fillRect(194, 9, 1, 3);
+}
+
+function drawKnob(ctx, x) {
+  ctx.clearRect(0, 0, 5, 9);
+  const knobColors = [
+    ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#696969'],
+    ['#FFFFFF', '#E3E3E3', '#E3E3E3', '#A0A0A0', '#696969'],
+    ['#FFFFFF', '#E3E3E3', '#F0F0F0', '#A0A0A0', '#696969'],
+    ['#FFFFFF', '#E3E3E3', '#F0F0F0', '#A0A0A0', '#696969'],
+    ['#FFFFFF', '#E3E3E3', '#F0F0F0', '#A0A0A0', '#696969'],
+    ['#FFFFFF', '#E3E3E3', '#F0F0F0', '#A0A0A0', '#696969'],
+    ['#FFFFFF', '#E3E3E3', '#F0F0F0', '#A0A0A0', '#696969'],
+    ['#F0F0F0', '#FFFFFF', '#A0A0A0', '#696969', '#F0F0F0'],
+    ['#F0F0F0', '#F0F0F0', '#696969', '#F0F0F0', '#F0F0F0']
+  ];
+  for (let y = 0; y < knobColors.length; y++) {
+    for (let x = 0; x < knobColors[y].length; x++) {
+      ctx.fillStyle = knobColors[y][x];
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+/* ---------- 2.2 Initialize sliders ---------- */
+
+for (let i = 1; i <= Math.min(16, sliderCount); i++) {
+  column1.innerHTML += createSliderHtml(i, leftMargins[i - 1]);
+}
+
+for (let i = 17; i <= Math.min(32, sliderCount); i++) {
+  column2.innerHTML += createSliderHtml(i, leftMargins[(i - 1) % 16]);
+}
+
+for (let i = 33; i <= Math.min(48, sliderCount); i++) {
+  column3.innerHTML += createSliderHtml(i, leftMargins[(i - 1) % 16]);
+}
+
+for (let i = 1; i <= sliderCount; i++) {
+  createSliderHandlers(i);
+
+}
+
+/* ---------- 2.3 Slider interaction: dragging and scoring ---------- */
+function createSliderHandlers(sliderIndex) {
+  const container = document.getElementById(`container${sliderIndex}`);
+  const lineCanvas = document.getElementById(`line${sliderIndex}Canvas`);
+  const knobCanvas = document.getElementById(`knob${sliderIndex}Canvas`);
+  const rectCanvas = document.getElementById(`rect${sliderIndex}Canvas`);
+  const segmentDisplay = document.getElementById(`segment${sliderIndex}Display`);
+
+  const lineCtx = lineCanvas.getContext('2d');
+  const knobCtx = knobCanvas.getContext('2d');
+  const rectCtx = rectCanvas.getContext('2d');
+
+  drawLines(lineCtx);
+  drawRectangles(rectCtx);
+  drawKnob(knobCtx, 0);
+
+  let dragOffsetX = 0;
+
+  function mouseMoveHandler(e) {
+    updateKnobPosition(e, false);
+  }
+
+  function mouseUpHandler(e) {
+    window.removeEventListener('mousemove', mouseMoveHandler);
+    window.removeEventListener('mouseup', mouseUpHandler);
+    updateKnobPosition(e, true);
+  }
+
+  knobCanvas.addEventListener('mousedown', function (e) {
+    const knobRect = knobCanvas.getBoundingClientRect();
+    dragOffsetX = e.clientX - knobRect.left;
+    window.addEventListener('mousemove', mouseMoveHandler);
+    window.addEventListener('mouseup', mouseUpHandler);
+    updateKnobPosition(e, false);
+  });
+
+  function updateKnobPosition(e, finalize) {
+    const rect = container.getBoundingClientRect();
+    const knobWidth = knobCanvas.getBoundingClientRect().width;
+    const effectiveWidth = rect.width - knobWidth + 1;
+
+    let newX = e.clientX - rect.left - dragOffsetX;
+    newX = Math.max(0, Math.min(newX, effectiveWidth));
+    const pixelsPerStep = effectiveWidth / 100;
+    const stepIndex = Math.round(newX / pixelsPerStep);
+    newX = stepIndex * pixelsPerStep;
+    knobCanvas.style.left = `${newX}px`;
+    drawKnob(knobCtx, newX);
+
+    if (finalize) {
+      segmentDisplay.textContent = stepIndex;
+      if (stepIndex === 50 && !sliderStates[sliderIndex]) {
+        sliderStates[sliderIndex] = true;
+        currentScore++;
+        updatePointScoreDisplay();
+      } else if (stepIndex !== 50 && sliderStates[sliderIndex]) {
+        sliderStates[sliderIndex] = false;
+        currentScore--;
+        updatePointScoreDisplay();
+      }
+    }
+  }
+}
+/* =======================================================
+   3. Send updated score to the server - DO NOT MODIFY!
+   =======================================================
+    */
+
+function updatePointScoreDisplay() {
+  document.getElementById('point-score').textContent = currentScore;
+  liveSend({"information_type": "score", "score": currentScore});
+}
+
+/* =======================================================
+   4. Set countdown
+
+   This section updates the displayed countdown every second.
+   =======================================================
+    */
+
+// This function updates the displayed countdown every second
+const visualCountdownInterval = setInterval(() => {
+    if (displayedTimeLeft > 0) {
+        displayedTimeLeft -= 1; // Decrease displayed time by 1
+        remainingTimeElement.textContent = displayedTimeLeft; // Update the display
+    }
+}, 1000);
+
+/* =======================================================
+   5. Zoom monitoring
+
+  This section records the browser's device pixel ratio (DPR), which is used as a proxy for browser zoom.
+  The initial DPR is sent to the server at the beginning of the task and stored as player.initial_zoom.
+  If the DPR changes later, the new value is sent to the server and stored as player.current_zoom.
+
+  To enforce a fixed zoom level, uncomment the line inside checkDPRChange(). When active, the overlay blocks
+  the task after a zoom change and disappears only once the participant restores the initial zoom level.
+   =======================================================
+    */
+
+function getCurrentDPR() {
+  return window.devicePixelRatio;
+}
+
+function checkDPRChange() {
+  const currentDPR = getCurrentDPR();
+  if (currentDPR !== initialDPR) {
+    liveSend({"information_type": "zoom", "zoom": currentDPR});
+    // Uncomment the next line to block the task after a zoom change.
+    document.getElementById('zoomOverlay').style.display = 'flex';
+  } else {
+    document.getElementById('zoomOverlay').style.display = 'none';
+  }
+}
+
+window.addEventListener('resize', checkDPRChange);
+
+function setInitialDPR() {
+  if (TimeTot - displayedTimeLeft < 5) {
+    initialDPR = window.devicePixelRatio;
+    localStorage.setItem('initialDPR', initialDPR); // Store the initial zoom level in localStorage
+    liveSend({"information_type": "initial_zoom", "initial_zoom": initialDPR});
+  } else {
+    initialDPR = parseFloat(localStorage.getItem('initialDPR')) || getCurrentDPR();
+  }
+}
+
+/* =======================================================
+   6. Get screen size - DO NOT MODIFY!
+   =======================================================
+    */
+
+function updateScreenHeight() {
+            var screenHeight = window.screen.height;
+            document.documentElement.style.setProperty('--screen-height', screenHeight + 'px');
+        }
+
+        document.addEventListener('DOMContentLoaded', updateScreenHeight);
+
+
+  function updateScreenWidth() {
+            var screenWidth = window.screen.width;
+            document.documentElement.style.setProperty('--screen-width', screenWidth + 'px');
+        }
+
+        document.addEventListener('DOMContentLoaded', updateScreenWidth);
+
+
+/* =======================================================
+   7. Rescale elements
+
+   This section compares the participant's screen size with a standard 1920 x 1080 display. If the available screen
+   is smaller, it computes a scaling ratio that reduces the size of the task elements so that they fit within the screen.
+
+   The scaling factor is capped at 1.25, meaning that elements can be scaled down by at most 20%. Modify this section
+   only to change the element-scaling rules.
+   =======================================================
+    */
+
+ function logViewportSize() {
+  const sw = screen.width;
+  const sh = screen.height;
+
+  const refW = 1920;
+  const refH = 1080;
+
+  const rawRatio = 1 / Math.min(sw / refW, sh / refH, 1);
+  const ratio = Math.min(rawRatio, 1.25);
+
+  document.documentElement.style.setProperty('--ratio', ratio);
+}
+
+/* =======================================================
+   8. Initialize page - DO NOT MODIFY!
+   =======================================================
+    */
+
+window.addEventListener('load', () => {
+   setInitialDPR();
+   logViewportSize();
+    checkDPRChange();
+
+  setTimeout(() => {
+    setInitialDPR();
+    logViewportSize();
+     checkDPRChange();
+  }, 500);
+
+});
+
+</script>
+{{ endblock }}

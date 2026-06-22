@@ -1,0 +1,17 @@
+{{ block title }}
+Thank you!
+{{ endblock }}
+
+{{ block content }}
+
+<p>
+    You have completed all rounds of the task.
+</p>
+
+<p>
+    In total, you solved <strong>{{ player.participant.tot_score }}</strong> sliders. Your total earnings for this study are
+    <strong>{{ player.participant.tot_payment  }}</strong>.
+</p>
+
+
+{{ endblock }}
